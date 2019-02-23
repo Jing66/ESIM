@@ -9,9 +9,16 @@ import argparse
 import torch
 import json
 
+import pdb
 from torch.utils.data import DataLoader
 from esim.data import NLIDataset
 from esim.model import ESIM
+
+import pdb
+import sys
+# a quick hack to get the import from other directories working
+sys.path.append(os.getcwd()+'/glomo')
+from models.graph import Graph
 
 
 def predict(model, dataloader, labeldict):
@@ -58,7 +65,7 @@ def predict(model, dataloader, labeldict):
     return predictions
 
 
-def main(test_files, pretrained_file, labeldict, output_dir, batch_size=32):
+def main(test_files, pretrained_file, labeldict, output_dir, batch_size=32, graph_ckpt=None):
     """
     Test the ESIM model with pretrained weights on the MultiNLI dataset.
 
@@ -87,11 +94,14 @@ def main(test_files, pretrained_file, labeldict, output_dir, batch_size=32):
     embedding_dim = checkpoint['model']['_word_embedding.weight'].size(1)
     hidden_size = checkpoint['model']['_projection.0.weight'].size(0)
     num_classes = checkpoint['model']['_classification.4.weight'].size(0)
+    attn_heads =  checkpoint['model']['_self_attn.2.weight'].size(0)
+    attn_dense_sz =  checkpoint['model']['_self_attn.2.weight'].size(1)
+
 
     print("\t* Loading test data...")
-    with open(os.path.normpath(test_files["matched"]), 'rb') as pkl:
+    with open(os.path.expanduser(test_files["matched"]), 'rb') as pkl:
         matched_test_data = NLIDataset(pickle.load(pkl))
-    with open(os.path.normpath(test_files["mismatched"]), 'rb') as pkl:
+    with open(os.path.expanduser(test_files["mismatched"]), 'rb') as pkl:
         mismatched_test_data = NLIDataset(pickle.load(pkl))
 
     matched_test_loader = DataLoader(matched_test_data,
@@ -102,9 +112,17 @@ def main(test_files, pretrained_file, labeldict, output_dir, batch_size=32):
                                         batch_size=batch_size)
 
     print("\t* Building model...")
+    graph = None
+    if graph_ckpt is not None:
+        graph_hparams = json.load(open('%s/config.json'%graph_ckpt,'r'))
+        print('\t* Loading graph from %s...'%graph_ckpt) 
+        graph = Graph(graph_hparams['Model'])
+
     model = ESIM(vocab_size,
                  embedding_dim,
                  hidden_size,
+                 attn_heads,
+                 attn_dense_sz,graph=graph,
                  num_classes=num_classes,
                  device=device).to(device)
 
@@ -147,4 +165,5 @@ if __name__ == "__main__":
          args.checkpoint,
          config['labeldict'],
          config['output_dir'],
-         config['batch_size'])
+         config['batch_size'],
+         config.get('graph_dir',None))

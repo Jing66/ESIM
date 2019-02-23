@@ -18,6 +18,11 @@ from esim.data import NLIDataset
 from esim.model import ESIM
 from utils import train, validate
 
+import pdb
+import sys
+# a quick hack to get the import from other directories working
+sys.path.append(os.getcwd()+'/glomo')
+from models.graph import Graph
 
 def main(train_file,
          valid_files,
@@ -31,7 +36,9 @@ def main(train_file,
          lr=0.0004,
          patience=5,
          max_grad_norm=10.0,
-         checkpoint=None):
+         attn_heads=5,
+         attn_dense_sz = 100,
+         checkpoint=None, graph_ckpt=None):
     """
     Train the ESIM model on the SNLI dataset.
 
@@ -85,6 +92,18 @@ def main(train_file,
                                          batch_size=batch_size)
 
     # -------------------- Model definition ------------------- #
+    graph = None
+    # load graph if available
+    if graph_ckpt is not None:
+        graph_hparams = json.load(open('%s/config.json'%graph_ckpt,'r'))
+        print('\t* Loading graph from %s...'%graph_ckpt) 
+        graph = Graph(graph_hparams['Model'])
+        if torch.cuda.is_available():
+            lm_ckpt = torch.load("%s/exprt.ckpt"%graph_ckpt)
+        else:
+            lm_ckpt = torch.load("%s/exprt.ckpt"%graph_ckpt, map_location=lambda storage, loc: storage)
+            graph.load_state_dict(lm_ckpt['graph'])
+        graph.freeze()
     print('\t* Building model...')
     with open(embeddings_file, 'rb') as pkl:
         embeddings = torch.tensor(pickle.load(pkl), dtype=torch.float)\
@@ -93,6 +112,9 @@ def main(train_file,
     model = ESIM(embeddings.shape[0],
                  embeddings.shape[1],
                  hidden_size,
+                 attn_heads = attn_heads,
+                 attn_dense_sz = attn_dense_sz,
+                 graph = graph,
                  embeddings=embeddings,
                  dropout=dropout,
                  num_classes=num_classes,
@@ -258,4 +280,7 @@ if __name__ == "__main__":
          config["lr"],
          config["patience"],
          config["max_gradient_norm"],
-         args.checkpoint)
+         config['attn_heads'],
+         config['attn_dense_sz'],
+         args.checkpoint,
+         config.get('graph_dir',None))

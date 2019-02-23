@@ -1,9 +1,10 @@
 {
-    "test_files": {"matched": "../data/preprocessed/MNLI/matched_test_data.pkl",
-                   "mismatched": "../data/preprocessed/MNLI/mismatched_test_data.pkl"},
+    "test_files": {"matched": "~/GLoMo/data/MNLI/preprocessed/matched_test_data.pkl",
+                   "mismatched": "~/GLoMo/data/MNLI/preprocessed/mismatched_test_data.pkl"},
     "labeldict": {"entailment": 0,
                   "neutral": 1,
                   "contradiction": 2},
-    "output_dir": "../data/results",
+    "output_dir": "mnli_experiment/fix_transfer/fuse_embd_master_sumDim2_tsps/results",
+    "graph_dir": "lm_experiment/master_sumDim2_tsps/best",    
     "batch_size": 32
 }
